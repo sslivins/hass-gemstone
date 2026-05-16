@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
 from homeassistant.components.select import (
     ATTR_OPTION,
     SERVICE_SELECT_OPTION,
@@ -13,6 +14,7 @@ from homeassistant.components.select import (
 )
 from homeassistant.const import ATTR_ENTITY_ID, CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -181,21 +183,26 @@ async def test_select_pattern_optimistically_updates_state(
     mock_device.refresh.assert_not_awaited()
 
 
-async def test_select_pattern_not_in_active_folder_is_noop(
+async def test_select_pattern_not_in_active_folder_is_rejected(
     hass: HomeAssistant,
     mock_client: MagicMock,
     mock_device: MagicMock,
 ) -> None:
     """A pattern name from a different folder must not play anything.
 
-    Guard against stale options being submitted while the folder is mid-switch.
+    HA's select platform validates against ``entity.options`` before
+    handing off to ``async_select_option``, so submitting a stale
+    option (e.g., one from a folder the user already navigated away
+    from) raises ``ServiceValidationError`` and the device is never
+    touched.
     """
     await _setup(hass)
     # active folder defaults to Christmas; ask for a Halloween-only pattern.
-    await hass.services.async_call(
-        SELECT_DOMAIN,
-        SERVICE_SELECT_OPTION,
-        {ATTR_ENTITY_ID: _pattern_entity_id(hass), ATTR_OPTION: "Spooky"},
-        blocking=True,
-    )
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            SELECT_DOMAIN,
+            SERVICE_SELECT_OPTION,
+            {ATTR_ENTITY_ID: _pattern_entity_id(hass), ATTR_OPTION: "Spooky"},
+            blocking=True,
+        )
     mock_device.play_pattern.assert_not_awaited()
