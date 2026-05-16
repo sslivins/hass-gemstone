@@ -8,6 +8,6 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/sslivins/hass-gemstone/issues",
-  "requirements": ["pygemstone==0.0.1"],
-  "version": "0.0.1"
+  "requirements": ["pygemstone==0.0.2"],
+  "version": "0.0.2"
 }
