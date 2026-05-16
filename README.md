@@ -117,4 +117,4 @@ Bug reports and PRs welcome on the
 
 ## License
 
-[MIT](LICENSE) © Sean Slivinski
+[MIT](LICENSE) © [sslivins](https://github.com/sslivins)
