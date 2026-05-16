@@ -75,3 +75,29 @@ async def test_select_option_calls_play_pattern(
     mock_device.play_pattern.assert_awaited_once()
     played = mock_device.play_pattern.call_args.args[0]
     assert played.name == "Halloween"
+
+
+async def test_select_option_optimistically_updates_state(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    mock_device: MagicMock,
+) -> None:
+    """After selecting a pattern, state must reflect the new pick immediately.
+
+    Regression test: the cloud's currentlyPlaying endpoint lags 30-60s
+    behind the device, so a post-action refresh used to return the
+    previous pattern and snap the dropdown back. The fix is an
+    optimistic local update -- no extra refresh.
+    """
+    await _setup(hass)
+    eid = _select_entity_id(hass)
+    assert hass.states.get(eid).state == "Christmas Classic"
+    mock_device.refresh.reset_mock()
+    await hass.services.async_call(
+        SELECT_DOMAIN,
+        SERVICE_SELECT_OPTION,
+        {ATTR_ENTITY_ID: eid, ATTR_OPTION: "Halloween"},
+        blocking=True,
+    )
+    assert hass.states.get(eid).state == "Halloween"
+    mock_device.refresh.assert_not_awaited()
