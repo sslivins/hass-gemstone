@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -52,4 +54,10 @@ class GemstonePatternSelect(GemstoneEntity, SelectEntity):
         if pattern is None:
             return
         await self.coordinator.device.play_pattern(pattern)
-        await self.coordinator.async_request_refresh()
+        # Optimistic local update: the cloud's ``currentlyPlaying`` endpoint
+        # lags ~30-60s behind the device, so refreshing immediately would
+        # report the previous pattern and snap the UI back. Publish the
+        # expected pattern locally; the next scheduled poll reconciles.
+        data = self.coordinator.data
+        if data is not None:
+            self.coordinator.async_set_updated_data(replace(data, pattern=pattern))

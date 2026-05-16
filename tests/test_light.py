@@ -131,6 +131,74 @@ async def test_light_brightness_change_replays_pattern(
     assert state is not None
 
 
+async def test_light_turn_off_optimistically_updates_state(
+    hass: HomeAssistant, mock_client: MagicMock, mock_device: MagicMock
+) -> None:
+    """After turn_off, state must flip OFF immediately without re-polling.
+
+    Regression test: the cloud's currentlyPlaying endpoint lags 30-60s
+    behind the device, so a post-action refresh used to return stale
+    on_state=True and snap the UI back ON. The fix is an optimistic
+    local update -- no extra refresh.
+    """
+    await _setup(hass)
+    eid = _light_entity_id(hass)
+    assert hass.states.get(eid).state == STATE_ON
+    mock_device.refresh.reset_mock()
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        SERVICE_TURN_OFF,
+        {ATTR_ENTITY_ID: eid},
+        blocking=True,
+    )
+    assert hass.states.get(eid).state == STATE_OFF
+    mock_device.refresh.assert_not_awaited()
+
+
+async def test_light_turn_on_optimistically_updates_state(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    mock_device: MagicMock,
+    device_state,
+) -> None:
+    """After turn_on, state must flip ON immediately without re-polling."""
+    device_state.on_state = False
+    mock_device.refresh.return_value = device_state
+    await _setup(hass)
+    eid = _light_entity_id(hass)
+    assert hass.states.get(eid).state == STATE_OFF
+    mock_device.refresh.reset_mock()
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: eid},
+        blocking=True,
+    )
+    assert hass.states.get(eid).state == STATE_ON
+    mock_device.refresh.assert_not_awaited()
+
+
+async def test_light_brightness_change_optimistically_updates_state(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    mock_device: MagicMock,
+) -> None:
+    """After a brightness change, state must reflect the new value immediately."""
+    await _setup(hass)
+    eid = _light_entity_id(hass)
+    mock_device.refresh.reset_mock()
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: eid, ATTR_BRIGHTNESS: 100},
+        blocking=True,
+    )
+    state = hass.states.get(eid)
+    assert state is not None
+    assert state.attributes["brightness"] == 100
+    mock_device.refresh.assert_not_awaited()
+
+
 async def test_light_brightness_no_op_when_unchanged(
     hass: HomeAssistant,
     mock_client: MagicMock,
