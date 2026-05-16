@@ -88,10 +88,10 @@ async def test_unload_entry(hass: HomeAssistant, mock_client: MagicMock) -> None
 
 
 @pytest.mark.parametrize(
-    ("page1", "page2", "expected_count"),
+    ("page1", "page2", "expected_folders"),
     [
-        (2, 0, 2),  # one full page then empty terminator
-        (0, 0, 0),  # no patterns at all -> empty options
+        (3, 0, 2),  # one full page (all 3 patterns across 2 folders) then empty
+        (0, 0, 0),  # no patterns at all -> empty catalogue
     ],
 )
 async def test_pattern_pagination_terminates(
@@ -100,7 +100,7 @@ async def test_pattern_pagination_terminates(
     folder_patterns: list[MagicMock],
     page1: int,
     page2: int,
-    expected_count: int,
+    expected_folders: int,
 ) -> None:
     pages = {1: folder_patterns[:page1], 2: folder_patterns[:page2]}
 
@@ -111,9 +111,12 @@ async def test_pattern_pagination_terminates(
 
     entry = _entry()
     entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id) or expected_count == 0
+    setup_ok = await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    if expected_count == 0:
-        # zero patterns is still a valid setup -- select gets an empty options list
+    if expected_folders == 0:
+        # zero patterns is still a valid setup -- catalogue is empty
+        assert setup_ok
+        assert entry.runtime_data.catalogue.folders == []
         return
-    assert len(entry.runtime_data.patterns) == expected_count
+    assert setup_ok
+    assert len(entry.runtime_data.catalogue.folders) == expected_folders

@@ -1,4 +1,4 @@
-"""Select platform: pick which saved Gemstone pattern is playing."""
+"""Select platform: cascading Folder -> Pattern pickers."""
 
 from __future__ import annotations
 
@@ -7,9 +7,8 @@ from dataclasses import replace
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from pygemstone import Pattern
 
-from . import GemstoneConfigEntry
+from . import GemstoneConfigEntry, PatternCatalogue
 from .coordinator import GemstoneCoordinator
 from .entity import GemstoneEntity
 
@@ -19,15 +18,61 @@ async def async_setup_entry(
     entry: GemstoneConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    patterns = entry.runtime_data.patterns
-    entities: list[SelectEntity] = [
-        GemstonePatternSelect(coord, patterns) for coord in entry.runtime_data.coordinators
-    ]
+    catalogue = entry.runtime_data.catalogue
+    entities: list[SelectEntity] = []
+    for coord in entry.runtime_data.coordinators:
+        entities.append(GemstoneFolderSelect(coord, catalogue))
+        entities.append(GemstonePatternSelect(coord, catalogue))
     async_add_entities(entities)
 
 
+def _folder_of_current_pattern(
+    coordinator: GemstoneCoordinator, catalogue: PatternCatalogue
+) -> str | None:
+    """Return the folder the device's currently-playing pattern lives in.
+
+    Falls through to the first folder alphabetically if the cloud
+    didn't report a recognised pattern.id.
+    """
+    data = coordinator.data
+    if data is not None and data.pattern is not None and data.pattern.id:
+        folder = catalogue.pattern_to_folder.get(data.pattern.id)
+        if folder is not None:
+            return folder
+    folders = catalogue.folders
+    return folders[0] if folders else None
+
+
+class GemstoneFolderSelect(GemstoneEntity, SelectEntity):
+    """Pick which pattern folder the pattern dropdown is browsing."""
+
+    _attr_translation_key = "folder"
+    _attr_icon = "mdi:folder-multiple"
+
+    def __init__(
+        self,
+        coordinator: GemstoneCoordinator,
+        catalogue: PatternCatalogue,
+    ) -> None:
+        super().__init__(coordinator, "folder")
+        self._catalogue = catalogue
+        self._attr_options = catalogue.folders
+
+    @property
+    def current_option(self) -> str | None:
+        if self.coordinator.active_folder in self._catalogue.by_folder:
+            return self.coordinator.active_folder
+        return _folder_of_current_pattern(self.coordinator, self._catalogue)
+
+    async def async_select_option(self, option: str) -> None:
+        if option not in self._catalogue.by_folder:
+            return
+        # Pure UI state -- no device call, no cloud round-trip.
+        self.coordinator.set_active_folder(option)
+
+
 class GemstonePatternSelect(GemstoneEntity, SelectEntity):
-    """Pick the active Gemstone pattern from the user's saved patterns."""
+    """Pick the active Gemstone pattern from within the active folder."""
 
     _attr_translation_key = "pattern"
     _attr_icon = "mdi:string-lights"
@@ -35,11 +80,22 @@ class GemstonePatternSelect(GemstoneEntity, SelectEntity):
     def __init__(
         self,
         coordinator: GemstoneCoordinator,
-        patterns: dict[str, Pattern],
+        catalogue: PatternCatalogue,
     ) -> None:
         super().__init__(coordinator, "pattern")
-        self._patterns = patterns
-        self._attr_options = sorted(patterns.keys())
+        self._catalogue = catalogue
+
+    def _effective_folder(self) -> str | None:
+        if self.coordinator.active_folder in self._catalogue.by_folder:
+            return self.coordinator.active_folder
+        return _folder_of_current_pattern(self.coordinator, self._catalogue)
+
+    @property
+    def options(self) -> list[str]:
+        folder = self._effective_folder()
+        if folder is None:
+            return []
+        return self._catalogue.patterns_in(folder)
 
     @property
     def current_option(self) -> str | None:
@@ -47,10 +103,18 @@ class GemstonePatternSelect(GemstoneEntity, SelectEntity):
         if data is None or data.pattern is None:
             return None
         name = data.pattern.name
-        return name if name in self._patterns else None
+        if not name:
+            return None
+        folder = self._effective_folder()
+        if folder is None:
+            return None
+        return name if name in self._catalogue.by_folder.get(folder, {}) else None
 
     async def async_select_option(self, option: str) -> None:
-        pattern = self._patterns.get(option)
+        folder = self._effective_folder()
+        if folder is None:
+            return
+        pattern = self._catalogue.get(folder, option)
         if pattern is None:
             return
         await self.coordinator.device.play_pattern(pattern)
