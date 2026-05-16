@@ -1,0 +1,13 @@
+{
+  "domain": "gemstone",
+  "name": "Gemstone Lights",
+  "codeowners": ["@sslivins"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/sslivins/hass-gemstone",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/sslivins/hass-gemstone/issues",
+  "requirements": ["pygemstone==0.0.1"],
+  "version": "0.0.1"
+}
