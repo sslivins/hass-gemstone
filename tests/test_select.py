@@ -72,12 +72,20 @@ async def test_folder_defaults_to_current_pattern_folder(
 async def test_pattern_options_only_include_active_folder(
     hass: HomeAssistant, mock_client: MagicMock
 ) -> None:
-    """The pattern dropdown shows only patterns from the active folder."""
+    """The pattern dropdown shows only patterns from the active folder.
+
+    The first option is always the ``Select a pattern…`` placeholder so
+    HA has something sensible to display when the device's pattern
+    isn't in the active folder.
+    """
     await _setup(hass)
     state = hass.states.get(_pattern_entity_id(hass))
     assert state is not None
-    # default active folder is Christmas -> only Christmas patterns visible
-    assert sorted(state.attributes["options"]) == ["Christmas Classic"]
+    # default active folder is Christmas -> placeholder + Christmas patterns
+    assert sorted(state.attributes["options"]) == [
+        "Christmas Classic",
+        "Select a pattern…",
+    ]
 
 
 async def test_pattern_current_option_matches_active_pattern(
@@ -106,10 +114,14 @@ async def test_switching_folder_changes_pattern_options(
 
     pattern_state = hass.states.get(_pattern_entity_id(hass))
     assert pattern_state is not None
-    assert sorted(pattern_state.attributes["options"]) == ["Halloween", "Spooky"]
+    assert sorted(pattern_state.attributes["options"]) == [
+        "Halloween",
+        "Select a pattern…",
+        "Spooky",
+    ]
     # The device is still playing "Christmas Classic" (not in Halloween folder),
-    # so the pattern dropdown shows no current selection.
-    assert pattern_state.state in (None, "unknown")
+    # so the pattern dropdown shows the placeholder rather than "unknown".
+    assert pattern_state.state == "Select a pattern…"
 
 
 async def test_switching_folder_does_not_call_device(
@@ -205,4 +217,23 @@ async def test_select_pattern_not_in_active_folder_is_rejected(
             {ATTR_ENTITY_ID: _pattern_entity_id(hass), ATTR_OPTION: "Spooky"},
             blocking=True,
         )
+    mock_device.play_pattern.assert_not_awaited()
+
+
+async def test_selecting_placeholder_is_noop(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    mock_device: MagicMock,
+) -> None:
+    """Selecting the ``Select a pattern…`` placeholder must not play anything."""
+    await _setup(hass)
+    await hass.services.async_call(
+        SELECT_DOMAIN,
+        SERVICE_SELECT_OPTION,
+        {
+            ATTR_ENTITY_ID: _pattern_entity_id(hass),
+            ATTR_OPTION: "Select a pattern…",
+        },
+        blocking=True,
+    )
     mock_device.play_pattern.assert_not_awaited()

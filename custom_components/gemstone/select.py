@@ -12,6 +12,12 @@ from . import GemstoneConfigEntry, PatternCatalogue
 from .coordinator import GemstoneCoordinator
 from .entity import GemstoneEntity
 
+# Shown as the pattern dropdown's current value when the device's playing
+# pattern isn't in the active folder (e.g., right after the user switches
+# folders without picking a pattern). It's also listed as the first option
+# so HA's service-call validator doesn't reject it; selecting it is a no-op.
+PATTERN_PLACEHOLDER = "Select a pattern…"
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -94,23 +100,25 @@ class GemstonePatternSelect(GemstoneEntity, SelectEntity):
     def options(self) -> list[str]:
         folder = self._effective_folder()
         if folder is None:
-            return []
-        return self._catalogue.patterns_in(folder)
+            return [PATTERN_PLACEHOLDER]
+        return [PATTERN_PLACEHOLDER, *self._catalogue.patterns_in(folder)]
 
     @property
     def current_option(self) -> str | None:
         data = self.coordinator.data
         if data is None or data.pattern is None:
-            return None
+            return PATTERN_PLACEHOLDER
         name = data.pattern.name
         if not name:
-            return None
+            return PATTERN_PLACEHOLDER
         folder = self._effective_folder()
-        if folder is None:
-            return None
-        return name if name in self._catalogue.by_folder.get(folder, {}) else None
+        if folder is None or name not in self._catalogue.by_folder.get(folder, {}):
+            return PATTERN_PLACEHOLDER
+        return name
 
     async def async_select_option(self, option: str) -> None:
+        if option == PATTERN_PLACEHOLDER:
+            return
         folder = self._effective_folder()
         if folder is None:
             return
