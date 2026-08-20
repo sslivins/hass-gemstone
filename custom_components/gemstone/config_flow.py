@@ -8,6 +8,11 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 from pygemstone import (
     GemstoneAuthError,
     GemstoneClient,
@@ -17,7 +22,10 @@ from pygemstone import (
 
 from .const import DOMAIN
 
-USER_SCHEMA = vol.Schema({vol.Required(CONF_EMAIL): str, vol.Required(CONF_PASSWORD): str})
+PASSWORD_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
+USER_SCHEMA = vol.Schema(
+    {vol.Required(CONF_EMAIL): str, vol.Required(CONF_PASSWORD): PASSWORD_SELECTOR}
+)
 
 
 class GemstoneConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -80,7 +88,7 @@ class GemstoneConfigFlow(ConfigFlow, domain=DOMAIN):
             errors["base"] = err
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): PASSWORD_SELECTOR}),
             errors=errors,
             description_placeholders={"email": entry.data[CONF_EMAIL]},
         )
