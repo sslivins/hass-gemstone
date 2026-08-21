@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry
@@ -19,6 +20,8 @@ from pygemstone import (
 
 from .const import PLATFORMS
 from .coordinator import GemstoneCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -131,6 +134,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: GemstoneConfigEntry) -> 
     for dev in devices:
         coord = GemstoneCoordinator(hass, entry, dev)
         await coord.async_config_entry_first_refresh()
+        try:
+            await coord.async_refresh_architectural_designs()
+        except (GemstoneConnectionError, GemstoneError):
+            _LOGGER.debug(
+                "Failed to load Custom Designs for %s; continuing without them",
+                dev.id,
+                exc_info=True,
+            )
         coordinators.append(coord)
 
     entry.runtime_data = GemstoneRuntimeData(
