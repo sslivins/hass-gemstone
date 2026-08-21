@@ -31,7 +31,8 @@
   "entity": {
     "select": {
       "folder": { "name": "Pattern folder" },
-      "pattern": { "name": "Pattern" }
+      "pattern": { "name": "Pattern" },
+      "custom_design": { "name": "Custom design" }
     }
   }
 }

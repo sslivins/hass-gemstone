@@ -237,3 +237,67 @@ async def test_selecting_placeholder_is_noop(
         blocking=True,
     )
     mock_device.play_pattern.assert_not_awaited()
+
+
+def _custom_design_entity_id(hass: HomeAssistant) -> str:
+    ent_reg = er.async_get(hass)
+    eid = ent_reg.async_get_entity_id(
+        SELECT_DOMAIN, DOMAIN, f"{DEVICE_ID}_custom_design"
+    )
+    assert eid is not None
+    return eid
+
+
+async def test_custom_design_options_include_saved_designs(
+    hass: HomeAssistant, mock_client: MagicMock
+) -> None:
+    await _setup(hass)
+    state = hass.states.get(_custom_design_entity_id(hass))
+    assert state is not None
+    assert sorted(state.attributes["options"]) == ["Front Door", "None"]
+
+
+async def test_select_custom_design_applies_it(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    mock_device: MagicMock,
+) -> None:
+    await _setup(hass)
+    await hass.services.async_call(
+        SELECT_DOMAIN,
+        SERVICE_SELECT_OPTION,
+        {ATTR_ENTITY_ID: _custom_design_entity_id(hass), ATTR_OPTION: "Front Door"},
+        blocking=True,
+    )
+    mock_device.apply_architectural_design.assert_awaited_once()
+    applied = mock_device.apply_architectural_design.call_args.args[0]
+    assert applied.name == "Front Door"
+
+
+async def test_selecting_custom_design_placeholder_is_noop(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    mock_device: MagicMock,
+) -> None:
+    await _setup(hass)
+    await hass.services.async_call(
+        SELECT_DOMAIN,
+        SERVICE_SELECT_OPTION,
+        {ATTR_ENTITY_ID: _custom_design_entity_id(hass), ATTR_OPTION: "None"},
+        blocking=True,
+    )
+    mock_device.apply_architectural_design.assert_not_awaited()
+
+
+async def test_no_custom_design_entity_when_none_saved(
+    hass: HomeAssistant, mock_client: MagicMock, mock_device: MagicMock
+) -> None:
+    """No Custom Design select entity is created if the device has none saved."""
+    mock_device.architectural_designs.return_value = []
+    await _setup(hass)
+    ent_reg = er.async_get(hass)
+    eid = ent_reg.async_get_entity_id(
+        SELECT_DOMAIN, DOMAIN, f"{DEVICE_ID}_custom_design"
+    )
+    assert eid is None
+

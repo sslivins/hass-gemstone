@@ -29,6 +29,8 @@ async def async_setup_entry(
     for coord in entry.runtime_data.coordinators:
         entities.append(GemstoneFolderSelect(coord, catalogue))
         entities.append(GemstonePatternSelect(coord, catalogue))
+        if coord.architectural_designs:
+            entities.append(GemstoneCustomDesignSelect(coord))
     async_add_entities(entities)
 
 
@@ -133,3 +135,44 @@ class GemstonePatternSelect(GemstoneEntity, SelectEntity):
         data = self.coordinator.data
         if data is not None:
             self.coordinator.async_set_updated_data(replace(data, pattern=pattern))
+
+
+# Shown when no Custom Design is currently applied (e.g. the device is
+# playing a folder pattern instead), and listed first so HA's service-call
+# validator accepts it as a valid "no selection" option.
+CUSTOM_DESIGN_PLACEHOLDER = "None"
+
+
+class GemstoneCustomDesignSelect(GemstoneEntity, SelectEntity):
+    """Pick one of the device's saved "Custom Designs" (Quick Access looks).
+
+    Unlike folder patterns, these are stored per-device rather than
+    per-homegroup (see ``pygemstone.ArchitecturalDesign``), so this is a
+    single flat picker with no folder cascade.
+    """
+
+    _attr_translation_key = "custom_design"
+    _attr_icon = "mdi:palette-swatch"
+
+    def __init__(self, coordinator: GemstoneCoordinator) -> None:
+        super().__init__(coordinator, "custom_design")
+
+    @property
+    def options(self) -> list[str]:
+        names = sorted({d.name for d in self.coordinator.architectural_designs if d.name})
+        return [CUSTOM_DESIGN_PLACEHOLDER, *names]
+
+    @property
+    def current_option(self) -> str | None:
+        return CUSTOM_DESIGN_PLACEHOLDER
+
+    async def async_select_option(self, option: str) -> None:
+        if option == CUSTOM_DESIGN_PLACEHOLDER:
+            return
+        design = next(
+            (d for d in self.coordinator.architectural_designs if d.name == option),
+            None,
+        )
+        if design is None:
+            return
+        await self.coordinator.device.apply_architectural_design(design)

@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from pygemstone import (
+    ArchitecturalDesign,
     Device,
     DeviceState,
     GemstoneAuthError,
@@ -49,6 +50,16 @@ class GemstoneCoordinator(DataUpdateCoordinator[DeviceState]):
         )
         self.device = device
         self.active_folder: str | None = None
+        self.architectural_designs: list[ArchitecturalDesign] = []
+
+    async def async_refresh_architectural_designs(self) -> None:
+        """Fetch this device's saved "Custom Designs" (Quick Access looks).
+
+        Best-effort: an error here shouldn't block integration setup, so
+        callers should be prepared for the list to stay empty if the
+        cloud call fails.
+        """
+        self.architectural_designs = await self.device.architectural_designs()
 
     def set_active_folder(self, folder: str | None) -> None:
         """Update the active folder and notify listening entities.

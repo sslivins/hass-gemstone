@@ -7,7 +7,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pygemstone import DeviceState, Folder, FolderPattern, HomeGroup, Pattern
+from pygemstone import ArchitecturalDesign, DeviceState, Folder, FolderPattern, HomeGroup, Pattern
 
 
 # pytest-homeassistant-custom-component auto-enables custom integrations via this
@@ -91,7 +91,24 @@ def homegroup() -> HomeGroup:
 
 
 @pytest.fixture
-def mock_device(device_state: DeviceState) -> MagicMock:
+def architectural_designs() -> list[ArchitecturalDesign]:
+    """This device's saved "Custom Designs" (Quick Access looks)."""
+    return [
+        ArchitecturalDesign(
+            id="ad-1",
+            device_id="h2-1074-y3w9",
+            name="Front Door",
+            brightness=255,
+            static_colors=[],
+            is_favorite=False,
+        )
+    ]
+
+
+@pytest.fixture
+def mock_device(
+    device_state: DeviceState, architectural_designs: list[ArchitecturalDesign]
+) -> MagicMock:
     """Build a fake pygemstone.Device for tests."""
     dev = MagicMock(name="Device")
     dev.id = "h2-1074-y3w9"
@@ -102,6 +119,8 @@ def mock_device(device_state: DeviceState) -> MagicMock:
     dev.turn_on = AsyncMock(return_value="tx-on")
     dev.turn_off = AsyncMock(return_value="tx-off")
     dev.play_pattern = AsyncMock(return_value="tx-pat")
+    dev.architectural_designs = AsyncMock(return_value=architectural_designs)
+    dev.apply_architectural_design = AsyncMock(side_effect=lambda d: d)
     return dev
 
 
