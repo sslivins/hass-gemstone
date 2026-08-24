@@ -128,6 +128,9 @@ class GemstonePatternSelect(GemstoneEntity, SelectEntity):
         if pattern is None:
             return
         await self.coordinator.device.play_pattern(pattern)
+        # A folder pattern supersedes any active Custom Design, so clear the
+        # design picker back to its "None" placeholder.
+        self.coordinator.active_custom_design = None
         # Optimistic local update: the cloud's ``currentlyPlaying`` endpoint
         # lags ~30-60s behind the device, so refreshing immediately would
         # report the previous pattern and snap the UI back. Publish the
@@ -164,10 +167,11 @@ class GemstoneCustomDesignSelect(GemstoneEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        return CUSTOM_DESIGN_PLACEHOLDER
+        return self.coordinator.active_custom_design or CUSTOM_DESIGN_PLACEHOLDER
 
     async def async_select_option(self, option: str) -> None:
         if option == CUSTOM_DESIGN_PLACEHOLDER:
+            self.coordinator.set_active_custom_design(None)
             return
         design = next(
             (d for d in self.coordinator.architectural_designs if d.name == option),
@@ -176,3 +180,7 @@ class GemstoneCustomDesignSelect(GemstoneEntity, SelectEntity):
         if design is None:
             return
         await self.coordinator.device.apply_architectural_design(design)
+        # The cloud can't report an active design (see
+        # ``set_active_custom_design``), so echo the selection as UI state
+        # instead of snapping back to the "None" placeholder.
+        self.coordinator.set_active_custom_design(design.name)

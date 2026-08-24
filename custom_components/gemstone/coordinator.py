@@ -51,6 +51,7 @@ class GemstoneCoordinator(DataUpdateCoordinator[DeviceState]):
         self.device = device
         self.active_folder: str | None = None
         self.architectural_designs: list[ArchitecturalDesign] = []
+        self.active_custom_design: str | None = None
 
     async def async_refresh_architectural_designs(self) -> None:
         """Fetch this device's saved "Custom Designs" (Quick Access looks).
@@ -70,6 +71,20 @@ class GemstoneCoordinator(DataUpdateCoordinator[DeviceState]):
         pattern dropdown's options switch in lockstep.
         """
         self.active_folder = folder
+        self.async_update_listeners()
+
+    def set_active_custom_design(self, name: str | None) -> None:
+        """Record which Custom Design was last applied and re-render selects.
+
+        The cloud's ``currentlyPlaying`` endpoint only ever reports a
+        *pattern* (it keeps returning the previously-played pattern even
+        while a static architectural design is lit), so it can't tell us
+        which design is active. We track the applied design as UI state —
+        mirroring ``active_folder`` — so the picker doesn't snap back to
+        the "None" placeholder after a selection. Playing a folder
+        pattern supersedes the design and clears this back to ``None``.
+        """
+        self.active_custom_design = name
         self.async_update_listeners()
 
     async def _async_update_data(self) -> DeviceState:
