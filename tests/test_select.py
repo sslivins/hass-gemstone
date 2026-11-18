@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,6 +17,7 @@ from homeassistant.const import ATTR_ENTITY_ID, CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
+from pygemstone import Pattern
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.gemstone.const import DOMAIN
@@ -67,6 +69,33 @@ async def test_folder_defaults_to_current_pattern_folder(
     assert state is not None
     # device's currently-playing pattern is "Christmas Classic" (in Christmas)
     assert state.state == "Christmas"
+
+
+async def test_folder_stays_put_when_no_known_pattern_is_playing(
+    hass: HomeAssistant, mock_client: MagicMock, gemstone_pattern_alt: Pattern
+) -> None:
+    """Regression: lighting a Custom Design made the folder jump to the first folder.
+
+    While a design is lit the cloud reports no folder pattern, so the
+    folder dropdown must stay on the last pattern's folder.
+    """
+    entry = await _setup(hass)
+    coordinator = entry.runtime_data.coordinators[0]
+    # Pattern started from the app, in a folder that isn't the first one.
+    coordinator.async_set_updated_data(
+        replace(coordinator.data, pattern=gemstone_pattern_alt)
+    )
+    await hass.async_block_till_done()
+    state = hass.states.get(_folder_entity_id(hass))
+    assert state is not None
+    assert state.state == "Halloween"
+
+    coordinator.async_set_updated_data(replace(coordinator.data, pattern=None))
+    await hass.async_block_till_done()
+
+    state = hass.states.get(_folder_entity_id(hass))
+    assert state is not None
+    assert state.state == "Halloween"
 
 
 async def test_pattern_options_only_include_active_folder(
