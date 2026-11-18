@@ -39,14 +39,18 @@ def _folder_of_current_pattern(
 ) -> str | None:
     """Return the folder the device's currently-playing pattern lives in.
 
-    Falls through to the first folder alphabetically if the cloud
-    didn't report a recognised pattern.id.
+    When nothing recognisable is playing (e.g. a Custom Design is lit),
+    stay on the folder of the last recognised pattern rather than jumping
+    to the first folder; that is only the fallback before any is seen.
     """
     data = coordinator.data
     if data is not None and data.pattern is not None and data.pattern.id:
         folder = catalogue.pattern_to_folder.get(data.pattern.id)
         if folder is not None:
+            coordinator.last_pattern_folder = folder
             return folder
+    if coordinator.last_pattern_folder in catalogue.by_folder:
+        return coordinator.last_pattern_folder
     folders = catalogue.folders
     return folders[0] if folders else None
 

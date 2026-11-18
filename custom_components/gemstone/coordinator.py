@@ -96,6 +96,7 @@ class GemstoneCoordinator(DataUpdateCoordinator[DeviceState]):
         )
         self.device = device
         self.active_folder: str | None = None
+        self.last_pattern_folder: str | None = None
         self.architectural_designs: list[ArchitecturalDesign] = []
 
     async def async_refresh_architectural_designs(self) -> None:
