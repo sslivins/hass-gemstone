@@ -6,7 +6,6 @@ from dataclasses import replace
 from unittest.mock import MagicMock
 
 import pytest
-from pygemstone import Pattern
 from homeassistant.components.select import (
     ATTR_OPTION,
     SERVICE_SELECT_OPTION,
@@ -18,6 +17,7 @@ from homeassistant.const import ATTR_ENTITY_ID, CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
+from pygemstone import Pattern
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.gemstone.const import DOMAIN
